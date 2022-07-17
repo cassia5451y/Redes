@@ -1,0 +1,199 @@
+import tkinter as tk
+import socket
+import base64
+
+from click import command
+
+
+#Criando a conexão TCP com o servidor usando a porta do SMTP
+serverName = "mail.labredes.info"
+serverPort = 587
+tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+tcp.connect((serverName, serverPort))
+recv = tcp.recv(1024)
+
+recv = recv.decode()
+
+if recv[:3] != '220':
+    print('\nResposta não recebida pelo servidor.')
+
+#Executando o comando Helo para acessar a caixa de e-mail
+heloCommand = 'HELO Lab\r\n'
+tcp.send(heloCommand.encode())
+recv = tcp.recv(1024)
+recv = recv.decode()
+
+if recv[:3] != '250':
+    print('\nResposta não recebida pelo servidor.')
+else:
+    print('\nConexão estabelecida')
+
+
+# Enviando a Menssagem
+def enviarMenssagem():
+    janela4 = tk.Toplevel()
+    janela4.title("")
+    janela4.geometry("300x250+800+330")
+    janela4.resizable(width=False, height=False)
+
+    contenttype = "text/plain" #informando para o servidor que o conteúdo se trata de um texto simples
+    global deUsuario, paraUsuario, asst, msgm, fim
+
+    deUsuario = usuario
+    paraUsuario = email_campo.get()
+    asst = assunto_campo.get()
+    msgm = menssagem_campo.get()
+    fim = "\r\n.\r\n"
+
+
+    # Enviando o comando MAIL FROM e imprimindo a resposta do servidor casou houver erro.
+    tcp.sendall(('MAIL FROM: <'+deUsuario+'>\r\n').encode())
+    recv = tcp.recv(1024).decode()
+    if (recv[:3] != '250'):
+        menssagem = tk.Label(janela4,text = "Resposta não recebida do servidor")
+        menssagem.grid(row = 1, column = 1,  pady = 2)
+
+    # Enviando o comando RCPT e imprimindo a resposta do servidor casou houver erro.
+    tcp.sendall(('RCPT TO: <'+paraUsuario+'>\r\n').encode())
+    recv = tcp.recv(1024).decode()
+    if (recv[:3] != '250'):
+        menssagem = tk.Label(janela4,text = "Resposta não recebida do servidor")
+        menssagem.grid(row = 2, column = 1,  pady = 2)
+
+    # Enviando o comando DATA e imprimindo a resposta do servidor casou houver erro.
+    tcp.send(('DATA\r\n').encode())
+    recv = tcp.recv(1024).decode()
+    if (recv[:3] != '354'):
+        menssagem = tk.Label(janela4,text = "Resposta não recebida do servidor")
+        menssagem.grid(row = 3, column = 1,  pady = 2)
+
+    #Enviando dados da mensagem para o destinatário
+    message = 'from:' + deUsuario  + '@labredes.info'+ '\r\n'
+    message += 'to:' +paraUsuario  + '\r\n'
+    message += 'subject:' + asst + '\r\n'
+    message += 'Content-Type:' + contenttype + '\r\n'
+    message += '\r\n' + msgm
+    tcp.sendall(message.encode())
+
+    #Informando o fim da mensagem para o servidor e imprimindo a resposta caso houver erro
+    tcp.sendall(fim.encode())
+    recv = tcp.recv(1024).decode()
+    if (recv[:3] != '250'):
+        menssagem = tk.Label(janela4,text = "Resposta não recebida do servidor")
+        menssagem.grid(row = 4, column = 1,  pady = 2)
+        
+    else:
+        menssagem = tk.Label(janela4,text = "Menssagem Enviada")
+        menssagem.grid(row = 1, column = 1,  pady = 2)
+        botaoSair  = tk.Button(janela4, text= "Sair", command= janela.destroy)
+        botaoSair["font"] = ("Arial", "10", "bold")
+        botaoSair.grid(row = 4, column = 3, pady = 2)
+        
+
+    tcp.sendall('QUIT\r\n'.encode())  
+    tcp.close()
+    
+
+# Inserir Menssagem
+def inserirMenssagem():
+    janela3 = tk.Toplevel()
+    janela3.title("SMTP")
+    janela3.geometry("300x250+800+330")
+    janela3.resizable(width=False, height=False)
+
+    global email_campo, assunto_campo, menssagem_campo
+
+     # Email do destinatario
+    
+    email_dest = tk.Label(janela3, text= "Email: ")
+    email_dest["font"] = ("Arial", "13")
+    email_dest.grid(row = 1, column = 0,  pady = 2)
+    email_campo = tk.Entry(janela3)
+    email_campo.grid (row = 1, column = 2,  pady = 2)
+
+     # Assunto
+    assunto = tk.Label(janela3, text= "Assunto: ")
+    assunto["font"] = ("Arial", "13")
+    assunto.grid(row = 2, column = 0,  pady = 2)
+    assunto_campo = tk.Entry(janela3)
+    assunto_campo.grid (row = 2, column = 2,  pady = 2)
+
+     # Menssagem
+    menssagem = tk.Label(janela3, text= "Menssagem: ")
+    menssagem["font"] = ("Arial", "13")
+    menssagem.grid(row = 3, column = 0,  pady = 2)
+    menssagem_campo = tk.Entry(janela3)
+    menssagem_campo.grid (row = 3, column = 2,  pady = 2)
+
+    botaoEnviar  = tk.Button(janela3, text= "Enviar", command= enviarMenssagem)
+    botaoEnviar["font"] = ("Arial", "10", "bold")
+    botaoEnviar.grid(row = 4, column = 2, pady = 2)
+ 
+
+
+# Validando Usuario
+def verificarUsuario():
+    janela2 = tk.Toplevel()
+    janela2.title("")
+    janela.geometry("300x250+800+330")
+    janela2.resizable(width=False, height=False)
+    
+    global usuario
+    global senha
+
+    usuario = nome_campo.get()
+    senha = senha_campo.get()
+
+    base64_str = ("\x00"+usuario+"\x00"+senha).encode()
+    base64_str = base64.b64encode(base64_str)
+    authMsg = "AUTH PLAIN ".encode()+base64_str+"\r\n".encode()
+    tcp.send(authMsg)
+    recv_auth = tcp.recv(1024)
+
+    recv = (recv_auth.decode())
+
+    if (recv[:3] != '235'):
+        menssagem = tk.Label(janela2,text = "Resposta não recebida do servidor")
+        menssagem.grid(row = 6, column = 1,  pady = 2)
+    
+    else:
+        menssagem = tk.Label(janela2,text = "Enviar Menssagem")
+        menssagem.grid(row = 1, column = 1,  pady = 2)
+        botao_escrever = tk.Button(janela2, text= "Escrever", command= inserirMenssagem)
+        botao_escrever.grid(row = 2, column = 2, pady = 2)
+        
+    
+
+# Janela de LOGIN
+janela = tk.Tk()
+
+janela.title("LOGIN")
+janela.resizable(width=False, height=False)
+
+titulo = tk.Label(janela, text="Dados do usuário")
+titulo["font"] = ("Arial", "15", "bold")
+titulo.grid(row = 0, column = 1, pady = 0)
+
+# Nome
+nome = tk.Label(janela, text= "Nome: ")
+nome["font"] = ("Arial", "13")
+nome.grid(row = 1, column = 0,  pady = 2)
+nome_campo = tk.Entry(janela)
+nome_campo.grid (row = 1, column = 1,  pady = 2)
+
+# Senha
+senha = tk.Label(janela, text= "Senha: ")
+senha["font"] = ("Arial", "13")
+senha.grid(row=2, column=0, pady= 2)
+senha_campo = tk.Entry(janela)
+senha_campo.grid(row=2, column=1, pady=2)
+senha_campo["show"] = "*"
+
+
+# Botao Entrar
+botao = tk.Button(janela, text= "Entrar", command= verificarUsuario)
+botao.grid(row = 6, column = 1, pady = 2)
+
+       
+janela.geometry("300x250+800+330")
+janela.mainloop()
