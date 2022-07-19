@@ -2,7 +2,6 @@ import tkinter as tk
 import socket
 import base64
 
-from click import command
 
 
 #Criando a conexão TCP com o servidor usando a porta do SMTP
